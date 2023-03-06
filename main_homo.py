@@ -3,7 +3,7 @@ from __future__ import print_function
 import torch.nn.functional as F
 import torch.optim as optim
 from utils import *
-from models_homo import MLP, HGCN
+from models_homo import MLP, HLAGNN
 from sklearn.metrics import f1_score
 import os
 import argparse
@@ -29,8 +29,9 @@ def train(args, config):
                     nclass=config.class_num,
                     dropout=config.dropout)
 
-    optimizer_mlp = optim.Adam(
-        model_MLP.parameters(), lr=config.lr, weight_decay=0.02)
+    optimizer_mlp = optim.Adam(model_MLP.parameters(),
+                               lr=config.lr,
+                               weight_decay=0.02)
     mlp_acc_val_best = 0
 
     # 增加计时
@@ -63,46 +64,68 @@ def train(args, config):
     # 测试1-hop neighbors
     # bi_adj = si_adj
 
-    model_HGCN = HGCN(nfeat=config.fdim,
-                      adj=adj,
-                      nhid1=config.nhid1,
-                      nhid2=config.nhid2,
-                      nclass=config.class_num,
-                      n_nodes=config.n_nodes,
-                      dropout=config.dropout)
+    feat_dim = config.fdim
+    idx_train_unmasked = idx_train
+    feat = features
 
-    optimizer_HGCN = optim.Adam(model_HGCN.parameters(),
-                                lr=config.lr,
-                                weight_decay=config.weight_decay)
+    if args.use_labels:
+        print("use labels")
+        # 若使用标记信息，需要增加标记onehot向量的长度
+        feat_dim = config.fdim + config.class_num
 
-    best_acc_val_HGCN = 0
+    model_HLAGNN = HLAGNN(nfeat=feat_dim,
+                          adj=adj,
+                          nhid1=config.nhid1,
+                          nhid2=config.nhid2,
+                          nclass=config.class_num,
+                          n_nodes=config.n_nodes,
+                          dropout=config.dropout)
+
+    optimizer_HLAGNN = optim.Adam(model_HLAGNN.parameters(),
+                                  lr=config.lr,
+                                  weight_decay=config.weight_decay)
+
+    best_acc_val_HLAGNN = 0
     best_f1 = 0
     best = 0
     best_test = 0
 
     for i in range(config.epochs):
-        model_HGCN.train()
+        model_HLAGNN.train()
         model_MLP.train()
 
-        optimizer_HGCN.zero_grad()
+        optimizer_HLAGNN.zero_grad()
         optimizer_mlp.zero_grad()
+
+        # 每一轮添加新的标记信息
+        if args.use_labels:
+            mask = torch.rand(idx_train.shape) < args.mask_rate
+            idx_train_masked = idx_train[mask]
+            idx_train_unmasked = idx_train[~mask]
+            feat = add_labels(features, labels, config.class_num, idx_train_masked)
 
         # 输出soft label和预测结果
         output = model_MLP(features)
-        out, adj_mask, emb = model_HGCN(features, si_adj, bi_adj, output)
+        out, adj_mask, emb = model_HLAGNN(feat, si_adj, bi_adj, output)
 
         # 计算loss
-        loss_mlp = F.nll_loss(output[idx_train], labels[idx_train])
-        loss = loss_mlp + F.nll_loss(out[idx_train], labels[idx_train])
+        loss_mlp = F.nll_loss(output[idx_train_unmasked], labels[idx_train_unmasked])
+        loss = loss_mlp + F.nll_loss(out[idx_train_unmasked], labels[idx_train_unmasked])
 
-        acc = accuracy(out[idx_train], labels[idx_train])
+        acc = accuracy(out[idx_train_unmasked], labels[idx_train_unmasked])
         loss.backward()
-        optimizer_HGCN.step()
+        optimizer_HLAGNN.step()
         optimizer_mlp.step()
 
         # 评估模型
-        model_HGCN.eval()
+        model_HLAGNN.eval()
         model_MLP.eval()
+
+        # 此处重新添加label feature
+        if args.use_labels:
+            feat = add_labels(features, labels, config.class_num, idx_train)
+        
+        out, adj_mask, emb = model_HLAGNN(feat, si_adj, bi_adj, output)
         acc_val = accuracy(out[idx_val], labels[idx_val])
         acc_test = accuracy(out[idx_test], labels[idx_test])
 
@@ -113,8 +136,8 @@ def train(args, config):
         labelcpu = labels[idx_test].data.cpu()
         macro_f1 = f1_score(labelcpu, label_max, average='macro')
 
-        if acc_val > best_acc_val_HGCN:
-            best_acc_val_HGCN = acc_val
+        if acc_val > best_acc_val_HLAGNN:
+            best_acc_val_HLAGNN = acc_val
             best_test = acc_test
             best_f1 = macro_f1
 
@@ -135,8 +158,10 @@ if __name__ == "__main__":
     parse = argparse.ArgumentParser()
     parse.add_argument("-d", "--dataset", help="dataset",
                        default="cora", type=str, required=False)
-    parse.add_argument("-l", "--labelrate",
-                       help="labeled data for train per class", default=20, type=int, required=False)
+    parse.add_argument("-m", "--mask_rate",
+                       help="masked labeled data for training", default=0.5, type=float, required=False)
+    parse.add_argument("--use_labels",
+                       help="use labels for propagation, default: false", action="store_true", required=False)
 
     args = parse.parse_args()
     config_file = "./config/" + str(args.dataset) + ".ini"

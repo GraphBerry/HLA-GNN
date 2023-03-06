@@ -78,9 +78,9 @@ class MLP(nn.Module):
 
 
 
-class HGCN(nn.Module):
+class HLAGNN(nn.Module):
     def __init__(self, nfeat, adj, nclass, nhid1, nhid2, n_nodes, dropout):
-        super(HGCN, self).__init__()
+        super(HLAGNN, self).__init__()
         self.GCN1 = GCN_homo(nfeat, adj, nhid1, nhid2, dropout)
         self.dropout = dropout
         self.a = nn.Parameter(torch.zeros(size=(nhid2, 1)))

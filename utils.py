@@ -138,7 +138,7 @@ def one_hot_embedding_train(labels, num_classes):
 
 def add_labels(x, labels, n_classes, idx):
     onehot = torch.zeros((x.shape[0], n_classes))
-    onehot[idx, labels[idx, 0]] = 1
+    onehot[idx, labels[idx]] = 1
 
     return torch.cat([x, onehot], dim=-1)
 
