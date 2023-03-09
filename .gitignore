@@ -1,4 +1,8 @@
-__pycache__/*
+*.pyc
+
+/__pycache__/*
 /.vscode/*
 /logs/*
 /data_geom/*
+
+/R1-baselines/dgl_dataset/data_geom

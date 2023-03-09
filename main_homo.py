@@ -33,6 +33,7 @@ def train(args, config):
                                lr=config.lr,
                                weight_decay=0.02)
     mlp_acc_val_best = 0
+    mlp_best_test = 0
 
     # 增加计时
     start = time.time()
@@ -52,8 +53,14 @@ def train(args, config):
         model_MLP.eval()
         acc_val = accuracy(output[idx_val], labels[idx_val])
         acc_test = accuracy(output[idx_test], labels[idx_test])
+        if acc_val > mlp_acc_val_best:
+            mlp_acc_val_best = acc_val
+            mlp_best_test = acc_test
+
         print(f"epoch: {i+1:4d}, loss: {loss.item(): .4f}, acc: train={acc.item(): .4f} "
               f"valid={acc_val.item(): .4f}  test={acc_test.item(): .4f}")
+    
+    print(f"best acc={mlp_best_test:.4f}")
 
     si_adj = adj.clone()
     bi_adj = adj.mm(adj)
@@ -129,24 +136,15 @@ def train(args, config):
         acc_val = accuracy(out[idx_val], labels[idx_val])
         acc_test = accuracy(out[idx_test], labels[idx_test])
 
-        label_max = []
-        for idx in idx_test:
-            label_max.append(torch.argmax(out[idx]).item())
-
-        labelcpu = labels[idx_test].data.cpu()
-        macro_f1 = f1_score(labelcpu, label_max, average='macro')
-
         if acc_val > best_acc_val_HLAGNN:
             best_acc_val_HLAGNN = acc_val
             best_test = acc_test
-            best_f1 = macro_f1
 
         if best < acc_test:
             best = acc_test
 
         print(f"epoch: {i+1:4d}, loss: {loss.item()-loss_mlp.item(): .4f}, acc: train={acc.item(): .4f} "
-              f"valid={acc_val.item(): .4f}  test={acc_test.item(): .4f}, "
-              f"f1-macro={macro_f1.item():.4f}")
+              f"valid={acc_val.item(): .4f}  test={acc_test.item(): .4f}")
 
     end = time.time()
 
