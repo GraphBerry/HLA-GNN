@@ -1,8 +1,15 @@
 *.pyc
 
+_layers_copy.py
+
 /__pycache__/*
 /.vscode/*
 /logs/*
 /data_geom/*
 
 /R1-baselines/dgl_dataset/data_geom
+/R1-baselines/cpgnn
+/R1-baselines/deepwalk
+/R1-baselines/h2gcn
+
+/synthetic_dataset

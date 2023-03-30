@@ -104,12 +104,23 @@ def train(args, config):
         optimizer_HLAGNN.zero_grad()
         optimizer_mlp.zero_grad()
 
-        # 每一轮添加新的标记信息
+        # 每一轮随机添加新的标记信息
         if args.use_labels:
+            # 添加真实标记信息
             mask = torch.rand(idx_train.shape) < args.mask_rate
             idx_train_masked = idx_train[mask]
             idx_train_unmasked = idx_train[~mask]
-            feat = add_labels(features, labels, config.class_num, idx_train_masked)
+            onehot = get_onehot(feat, labels, config.class_num, idx_train_masked)
+            
+            if args.label_reuse:
+                # 首先标记重利用，添加软标记output
+                idx_soft = torch.cat((idx_val, idx_test), 0)
+                # 此处output不加入计算图
+                onehot[idx_soft] = output.detach()[idx_soft]
+            # 最后再补充特征
+            feat = torch.cat((features, onehot), 1)
+
+
 
         # 输出soft label和预测结果
         output = model_MLP(features)
@@ -151,6 +162,8 @@ def train(args, config):
     print(f"Elapsed Time={end - start}(s)")
     print("Best accuracy:", best_test.item())
 
+    return best_test.item() * 100
+
 
 if __name__ == "__main__":
     parse = argparse.ArgumentParser()
@@ -160,6 +173,8 @@ if __name__ == "__main__":
                        help="masked labeled data for training", default=0.5, type=float, required=False)
     parse.add_argument("--use_labels",
                        help="use labels for propagation, default: false", action="store_true", required=False)
+    parse.add_argument("--label_reuse",
+                       help="reuse soft labels for propagation, default: false", action="store_true", required=False)
 
     args = parse.parse_args()
     config_file = "./config/" + str(args.dataset) + ".ini"
@@ -169,13 +184,19 @@ if __name__ == "__main__":
     cuda = True
     use_seed = True  # True
 
-    if use_seed:
-        np.random.seed(config.seed)
-        torch.manual_seed(config.seed)
-        if cuda:
-            torch.cuda.manual_seed(config.seed)
+    results = []
+    for split_id in range(10):
+        if use_seed:
+            np.random.seed(config.seed)
+            torch.manual_seed(config.seed)
+            if cuda:
+                torch.cuda.manual_seed(config.seed)
 
-    # 打印配置文件
-    print(vars(config))
+        # 打印配置文件
+        config.update_path(split_id)
+        print(vars(config))
+        results.append(train(args, config))
 
-    train(args, config)
+    print(results)
+    calc_mean_sd(results)
+

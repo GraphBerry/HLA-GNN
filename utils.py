@@ -136,12 +136,18 @@ def one_hot_embedding_train(labels, num_classes):
     
     return y[labels]
 
+def get_onehot(x, labels, n_classes, idx):
+    onehot = torch.zeros((x.shape[0], n_classes))
+    onehot[idx, labels[idx]] = 1
+
+    return onehot
+
+
 def add_labels(x, labels, n_classes, idx):
     onehot = torch.zeros((x.shape[0], n_classes))
     onehot[idx, labels[idx]] = 1
 
     return torch.cat([x, onehot], dim=-1)
-
 
 def soft_label(soft):
     """Embedding labels to one-hot form.
@@ -169,3 +175,15 @@ def load_graph_homo(config):
     nsadj = sparse_mx_to_torch_sparse_tensor(nsadj)
 
     return sadj, nsadj
+
+
+def calc_mean_sd(results):
+    results = np.around(results, decimals=5)
+    MEAN = np.mean(results, axis=0)
+    # PSD = np.std(results, axis=0)
+    SSD = np.std(results, axis=0, ddof=1)
+
+    # print(MEAN, PSD, SSD)
+    metric_name = ['accuracy']
+    for i, name in enumerate(metric_name):
+        print("{}= {:3.2f}±{:3.2f}".format(name, MEAN, SSD))

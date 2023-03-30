@@ -33,7 +33,12 @@ class Config(object):
         self.test_path = conf.get("Data_Setting", "test_path")
         self.train_path = conf.get("Data_Setting", "train_path")
         self.val_path = conf.get("Data_Setting", "val_path")
-
+    
+    def update_path(self, split_id=0):
+        prefix = self.test_path[:-9]
+        self.test_path = f"{prefix}{split_id}test.txt"
+        self.train_path = f"{prefix}{split_id}train.txt"
+        self.val_path = f"{prefix}{split_id}val.txt"
 
 
 

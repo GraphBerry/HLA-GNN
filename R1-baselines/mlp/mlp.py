@@ -130,7 +130,7 @@ def train(train_set, val_set, test_set, dataset_name, n_feats, n_classes,
 
     model.eval()
     stopper.load_checkpoint(model)
-    print("\nBest epoch: {stopper.best_ep}, Final test results:\n")
+    print(f"\nBest epoch: {stopper.best_ep}, Final test results:\n")
 
     acc_test = evaluate(model, test_loader, device=device)
 

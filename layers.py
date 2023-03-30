@@ -84,7 +84,9 @@ class GraphConvolution_homo(Module):
         
         # 求出, 即相似度
         sim_matrix = torch.matmul(output, output.t())
-
+        
+        # 若要消融，取消注释下一行，同时注释公式（10）
+        # sim_matrix = None
         # 公式（10）A_k*H
         bi_adj = torch.mul(bi_adj, sim_matrix)
 
